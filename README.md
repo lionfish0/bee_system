@@ -15,4 +15,9 @@ The full system to run on the flight raspberry pi
 
    export GI_TYPELIB_PATH=$GI_TYPELIB_PATH:~/aravis/src
    export LD_LIBRARY_PATH=~aravis/src/.libs
-  
+
+# System Requirements 
+
+    pip install Flask
+
+
