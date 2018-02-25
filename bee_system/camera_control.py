@@ -49,7 +49,7 @@ class Camera_Control():
         self.camera.set_region (0,0,2064,1544) #2064x1544
         #camera.set_binning(1,1) #basically disable
         #camera.set_frame_rate (10.0)
-        self.camera.set_exposure_time(5000)#ms
+        self.camera.set_exposure_time(5000)#us
         self.camera.set_gain(300)
         self.camera.set_pixel_format (Aravis.PIXEL_FORMAT_MONO_8)
         self.camera.set_trigger("Line1");
@@ -64,7 +64,7 @@ class Camera_Control():
         print("Starting Acquisition")
         self.camera.start_acquisition ()
         print("Creating stream buffer")
-        for i in range(0,20):
+        for i in range(0,8):
             self.stream.push_buffer (Aravis.Buffer.new_allocate(self.payload))
         print("Done")    
         self.prs = queue.Queue()
