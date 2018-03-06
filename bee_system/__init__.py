@@ -1,6 +1,7 @@
 from flask import Flask, make_response
 from bee_system.blink_control import blink_worker, configure_gpio
 from bee_system.camera_control import Camera_Control
+from bee_system.tracking_control import Tracking_Control
 import threading
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -15,6 +16,7 @@ CORS(app)
 
 startupdone = False
 cam_control = None
+tracking_control = None
 
 @app.route('/startup/<int:exposure>/<int:gain>')
 def startup(exposure,gain):
@@ -30,6 +32,10 @@ def startup(exposure,gain):
     cam_control = Camera_Control(exposure,gain)
     cam_control.print_status()
     t = threading.Thread(target=cam_control.worker)
+    t.start()
+    global tracking_control
+    tracking_control = Tracking_Control(cam_control.prs)
+    t = threading.Thread(target=tracking_control.worker)
     t.start()
     startupdone = True
     return "Startup complete"
@@ -81,10 +87,10 @@ def getcurrentimage(img,cmax):
     #msg += "%0.5f\n" % (np.mean(pair[0].img))
     #msg += "%0.2f\n" % (np.mean(pair[1].img))
     #return msg
-    fig = Figure(figsize=[9,9])
+    fig = Figure(figsize=[3,2.25])
     axis = fig.add_subplot(1, 1, 1)   
-    axis.imshow(pair[img].img[::2,::2],clim=[0,cmax])
-    #fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
+    axis.imshow(pair[img].img[::10,::10],clim=[0,cmax])
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
     canvas = FigureCanvas(fig)
     output = io.BytesIO()
     fig.patch.set_alpha(0)
@@ -93,6 +99,29 @@ def getcurrentimage(img,cmax):
 
     response.mimetype = 'image/png'
     return response
+    
+@app.route('/gettrackingimage/<int:index>/<int:img>/<int:cmax>')
+def gettrackingimage(index,img,cmax):
+    if cmax<1 or cmax>255:
+        return "cmax parameter must be between 1 and 255."
+    if img<0 or img>1:
+        return "image must be 0 or 1"
+    pair = tracking_control.tracking_results[index]['lowresimages']
+    fig = Figure(figsize=[3,2.25])
+    axis = fig.add_subplot(1, 1, 1)   
+    axis.imshow(pair[img],clim=[0,cmax])
+    loc = tracking_control.tracking_results[index]['location']
+    axis.plot(loc[1]/10,loc[0]/10,'w+',markersize=20)
+    
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
+    canvas = FigureCanvas(fig)
+    output = io.BytesIO()
+    fig.patch.set_alpha(0)
+    canvas.print_png(output)
+    response = make_response(output.getvalue())
+
+    response.mimetype = 'image/png'
+    return response    
 
 @app.route('/findretroreflectors')
 def findretroreflectors():
@@ -108,17 +137,19 @@ def findretroreflectors():
 
 @app.route('/imagestats')
 def imagestats():
-    if not startupdone:
-        return "Not online"
-    if cam_control.prs.empty():
-        return "No new image"
-    pair = cam_control.prs.queue[0]
+#    if not startupdone:
+#        return "Not online"
+#    if cam_control.prs.empty():
+#        return "No new image"
+#    pair = cam_control.prs.queue[0]
     msg = ""
-    for img in [0,1]:
-        msg+= "Image: %d\n" % img
-        msg+= "  Max: %d\n" % np.max(pair[img].img)
-        msg+= "  Min: %d\n" % np.min(pair[img].img)
-        msg+= " Mean: %0.2f\n" % np.mean(pair[img].img)
+#    for img in [0,1]:
+#        msg+= "Image: %d\n" % img
+#        msg+= "  Max: %d\n" % np.max(pair[img].img)
+#        msg+= "  Min: %d\n" % np.min(pair[img].img)
+#        msg+= " Mean: %0.2f\n" % np.mean(pair[img].img)
+    msg+=""
+    msg+=tracking_control.get_status_string()
     return msg
     
 @app.route('/stop')
