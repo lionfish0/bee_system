@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style> /* set the CSS */
+#noflash_image {
+    position:absolute;
+    left:350px;
+    top:90px;
+    width:300px;
+    height:300px;
+    background-image:url("nodata.png");
+}
+#config {
+    position:absolute;
+    left:30px;
+    top:90px;
+    width:300px;
+    height:300px;
+}
+#flash_image {
+    position:absolute;
+    left:680px;
+    top:90px;
+    width:300px;
+    height:300px;
+    background-image:url("nodata.png");
+}
+#noflash_title {
+    position:absolute;
+    left:350px;
+    top:60px;
+}
+#flash_title {
+    position:absolute;
+    left:680px;
+    top:60px;
+    
+}
+</style>
+<head>
+ <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+</head>
+<body>
+
+
+<h3>Bumblebee Tracking System</h3>
+<div id="config">
+<input id="url" value="192.168.1.8:5000" />
+<button id="startup">Startup</button>
+<br/>
+Capture:
+<button id="start">Start</button>
+<button id="stop">Stop</button>
+<button id="download">Download</button>
+<br/>
+Status: <span id="status">Offline</span>
+</div>
+<span id="noflash_title">No Flash</span>
+<div id="noflash_image">
+</div>
+<span id="flash_title">Flash</span>
+<div id="flash_image">
+</div>
+<script>
+$('button#startup').click(function(){
+    $('span#status').text('Starting up...');
+    url = "http://"+$('input#url').val()+"/startup/100/0";
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Possible Startup Error');
+        if (data=="Already Running") {$('span#status').text('Online');}
+        if (data=="Startup complete") {$('span#status').text('Online');}
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Startup Error');},
+    });
+});
+$('button#start').click(function(){
+    $('span#status').text('Starting...');
+    url = "http://"+$('input#url').val()+"/start";
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Possible Start Error');
+        if (data=="Blinking Started") {$('span#status').text('Running');}
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Start Error');},
+    });
+});
+$('button#stop').click(function(){
+    $('span#status').text('Stop...');
+    url = "http://"+$('input#url').val()+"/stop";
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Possible Stop Error');
+        if (data=="Blinking Stopped") {$('span#status').text('Online');}
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Stop Error');},
+    });
+});
+$('button#download').click(function(){
+    $('span#status').text('Downloading...');
+    url = "http://"+$('input#url').val()+"/getcurrentimage/0/10";
+    $('#flash_image').css("background-image","url('"+url+"')");
+   /* $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Downloaded');
+        if (data=="No new image") {$('span#status').text('No Image');}
+        //else {$('#flash_image').css("background-image","data:image/png,"+data);}
+        
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Download Error');}
+    });*/
+});
+</script>
+</body>
+
