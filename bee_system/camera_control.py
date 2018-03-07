@@ -121,6 +121,9 @@ class Camera_Control():
             if pr[0].ok and pr[1].ok:
                 print("Both ok, saving")
                 self.prs.put(pr)
+            else:
+                pr[0].returnbuffer()
+                pr[1].returnbuffer()                
                 
     def close(self):
         self.camera.stop_acquisition ()

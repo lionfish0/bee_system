@@ -1,5 +1,5 @@
 from flask import Flask, make_response
-from bee_system.blink_control import blink_worker, configure_gpio
+from bee_system.blink_control import Blink_Control, configure_gpio
 from bee_system.camera_control import Camera_Control
 from bee_system.tracking_control import Tracking_Control
 import threading
@@ -24,9 +24,9 @@ def startup(exposure,gain):
     if startupdone:
         return "Already Running"
     configure_gpio()
-    global run_blink
-    run_blink = threading.Event()
-    t = threading.Thread(target=blink_worker,args=(run_blink,))
+    global blink_control
+    blink_control = Blink_Control()
+    t = threading.Thread(target=blink_control.worker)#,args=(blink_control.run_blink,))
     t.start()
     global cam_control
     cam_control = Camera_Control(exposure,gain)
@@ -39,6 +39,13 @@ def startup(exposure,gain):
     t.start()
     startupdone = True
     return "Startup complete"
+
+@app.route('/setinterval/<int:interval>')
+def setinterval(interval):
+    if startupdone:
+        global blink_control
+        blink_control.t = interval
+    return "0"
 
 @app.route('/setcamera/<int:exposure>/<int:gain>')
 def setcamera(exposure,gain):
@@ -56,7 +63,8 @@ def hello_world():
 
 @app.route('/start')
 def start():
-    run_blink.set()
+    global blink_control
+    blink_control.run_blink.set()
     return "Blinking Started"
 
 @app.route('/nextimage')
@@ -99,6 +107,15 @@ def getcurrentimage(img,cmax):
 
     response.mimetype = 'image/png'
     return response
+
+@app.route('/gettrackingimagecount')
+def gettrackingimagecount():
+    global startupdone
+    if startupdone:
+        return str(len(tracking_control.tracking_results))
+    else:
+        return "0"
+
     
 @app.route('/gettrackingimage/<int:index>/<int:img>/<int:cmax>')
 def gettrackingimage(index,img,cmax):
@@ -106,6 +123,8 @@ def gettrackingimage(index,img,cmax):
         return "cmax parameter must be between 1 and 255."
     if img<0 or img>1:
         return "image must be 0 or 1"
+    if (index>=len(tracking_control.tracking_results)) or (index<0):
+        return "out of rane"
     pair = tracking_control.tracking_results[index]['lowresimages']
     fig = Figure(figsize=[3,2.25])
     axis = fig.add_subplot(1, 1, 1)   
@@ -154,7 +173,8 @@ def imagestats():
     
 @app.route('/stop')
 def stop():
-    run_blink.clear()
+    global blink_control
+    blink_control.run_blink.clear()
     return "Blinking Stopped"  
     
 @app.route('/shutdown')
@@ -168,8 +188,8 @@ def shutdown():
         cam_control.close()
         cam_control = None
         stop()
-        global run_blink
-        run_blink = None
+        global blink_control
+        blink_control = None
         startupdone = False
         return "Shutdown Complete"
     else:
