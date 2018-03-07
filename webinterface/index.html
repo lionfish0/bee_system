@@ -37,7 +37,8 @@
 }
 </style>
 <head>
- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+ <script src="jquery-3.3.1.min.js"></script>
+ 
 </head>
 <body>
 
@@ -49,8 +50,22 @@
 <br/>
 Capture:
 <button id="start">Start</button>
-<button id="stop">Stop</button>
-<button id="download">Download</button>
+<button id="stop">Stop</button><br/>
+Interval <input id="interval" value=3 size=2/> seconds
+<button id="setinterval">set</button><br/><br />
+
+<button id="download" class="refreshimages">Download</button>
+<button id="imagedown" class="refreshimages">&lt;</button>
+<button id="imageup" class="refreshimages">&gt;</button>
+<br />
+<input type="checkbox" id="latestimage">Update to latest image</input>
+<br />
+<br />Image <span id="index">0</span> of <span id="trackingimagecount">?</span><br />
+Image threshold: <input id="maxval" size=3 value=10 />
+
+Exposure: <input id="exposure" value="100" size="5" />&mu;s<br />
+Gain: <input id="gain" value="0" size="5" />dB<br />
+<button id="set">Set</button>
 <br/>
 Status: <span id="status">Offline</span>
 </div>
@@ -61,9 +76,11 @@ Status: <span id="status">Offline</span>
 <div id="flash_image">
 </div>
 <script>
+image = 0
+trackingimagecount = 0
 $('button#startup').click(function(){
     $('span#status').text('Starting up...');
-    url = "http://"+$('input#url').val()+"/startup/100/0";
+    url = "http://"+$('input#url').val()+"/startup/"+$('input#exposure').val()+"/"+$('input#gain').val();
     $.ajax({
       url: url,
       success: function(data, status, jqXHR){
@@ -98,10 +115,42 @@ $('button#stop').click(function(){
       error: function(jqXHR, status, errorThrown){$('span#status').text('Stop Error');},
     });
 });
-$('button#download').click(function(){
+$('button#imageup').click(function(){image=image+1;})
+$('button#imagedown').click(function(){image=image-1;})
+
+setInterval(function(){ 
+    url = "http://"+$('input#url').val()+"/gettrackingimagecount";
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        newtic = data
+        if (newtic!=trackingimagecount)
+        {
+            trackingimagecount = newtic
+            $('span#status').text("new image");
+            if($("#latestimage").is(':checked')) {
+                image = trackingimagecount-1
+                $('#download').click();
+            }
+        }
+        else
+        {
+            $('span#status').text("");        
+        }
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Error getting tracking image count.');}
+    });
+    //code goes here that will be run every 5 seconds.    
+}, 1000);
+
+$('button.refreshimages').click(function(){
+    $('span#index').text(image+1);//have to add one as python is zero indexed
+    $('span#trackingimagecount').text(trackingimagecount);
     $('span#status').text('Downloading...');
-    url = "http://"+$('input#url').val()+"/getcurrentimage/0/10";
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/0/"+$('input#maxval').val();
     $('#flash_image').css("background-image","url('"+url+"')");
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/1/"+$('input#maxval').val();
+    $('#noflash_image').css("background-image","url('"+url+"')");    
    /* $.ajax({
       url: url,
       success: function(data, status, jqXHR){
@@ -112,6 +161,28 @@ $('button#download').click(function(){
       },
       error: function(jqXHR, status, errorThrown){$('span#status').text('Download Error');}
     });*/
+});
+$('button#setinterval').click(function(){
+    $('span#status').text('Setting...');
+    url = "http://"+$('input#url').val()+"/setinterval/"+$('input#interval').val();
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Set');
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Set Error');}
+    });
+});
+$('button#set').click(function(){
+    $('span#status').text('Setting...');
+    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val();
+    $.ajax({
+      url: url,
+      success: function(data, status, jqXHR){
+        $('span#status').text('Set');
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Set Error');}
+    });
 });
 </script>
 </body>
