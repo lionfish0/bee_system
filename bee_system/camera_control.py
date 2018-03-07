@@ -26,17 +26,20 @@ class PhotoResult():
             
     def get_photo(self,timeout):
         """Blocking: Stores an image in self.img"""
+        print("Awaiting Image from camera (timeout=%d)" % timeout)
         self.buffer = self.stream.timeout_pop_buffer(timeout) #blocking
         if self.buffer is None:
             self.ok = False
+            print("failed")
             return
         
         self.status = self.buffer.get_status()
-            
         if self.status!=0:
+            print("failed")
             self.ok = False
             self.returnbuffer()
             return
+        print("Success")
         self.ok = True #success
         raw = np.frombuffer(self.buffer.get_data(),dtype="B1").astype(float)
         self.img = np.reshape(raw,[1544,2064])
@@ -111,6 +114,7 @@ class Camera_Control():
             timeouts = [10000000000,500000]#in us: 10000s or 0.5s
             for i in [0,1]:
                 pr[i] = PhotoResult(self.stream)
+                print("Awaiting photo %d" % i)
                 pr[i].get_photo(timeouts[i]) #blocking
                 print("Got Photo %d of pair" % i)
                 print("Status: %d" % pr[i].status)
