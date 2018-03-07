@@ -23,9 +23,9 @@ class Tracking_Control():
             shift = rd.getshift(pair[0].img,pair[1].img)
             out_img = rd.getblockmaxedimage(pair[1].img)
             done = rd.alignandsubtract(out_img,shift,pair[0].img)
-            p = np.unravel_index(done.argmax(), done.shape)
-            
-            print("Location: %d %d" % p)
+            p = np.array(np.unravel_index(done.argmax(), done.shape))+100 #shift by 200 pixels
+
+            print("Location: %d %d" % (p[0],p[1]))
             
             lowresimages = []
             for img in [0,1]:
