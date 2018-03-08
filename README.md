@@ -24,4 +24,7 @@ A demo of the web interface.
 
     pip install Flask
 
+# Other notes
+
+I'm trying out <a href="https://howtoraspberrypi.com/create-a-wi-fi-hotspot-in-less-than-10-minutes-with-pi-raspberry/">this site</a> for providing a wifi hotspot.
 
