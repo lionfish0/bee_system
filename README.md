@@ -26,5 +26,4 @@ A demo of the web interface.
 
 # Other notes
 
-I'm trying out <a href="https://howtoraspberrypi.com/create-a-wi-fi-hotspot-in-less-than-10-minutes-with-pi-raspberry/">this site</a> for providing a wifi hotspot.
-
+I'm trying out <a href="https://howtoraspberrypi.com/create-a-wi-fi-hotspot-in-less-than-10-minutes-with-pi-raspberry/">this site</a> for providing a wifi hotspot. And install <pre>http-server</pre> to host the webserver files.
