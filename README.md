@@ -1,5 +1,9 @@
 # bee_system
-The full system to run on the flight raspberry pi
+This module includes both the system to run on the flight raspberry pi and a web interface.
+
+A demo of the web interface.
+
+<img src="exampletracker.png" />
 
 # Install Instructions
 1. Download the aravis library:
@@ -20,4 +24,6 @@ The full system to run on the flight raspberry pi
 
     pip install Flask
 
+# Other notes
 
+I'm trying out <a href="https://howtoraspberrypi.com/create-a-wi-fi-hotspot-in-less-than-10-minutes-with-pi-raspberry/">this site</a> for providing a wifi hotspot. And install <pre>http-server</pre> to host the webserver files.
