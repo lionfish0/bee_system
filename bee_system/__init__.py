@@ -10,6 +10,7 @@ import io
 import retrodetect as rd
 from flask_cors import CORS
 import base64
+import sys
 
 app = Flask(__name__)
 CORS(app)
@@ -140,7 +141,16 @@ def gettrackingimage(index,img,cmax):
     response = make_response(output.getvalue())
 
     response.mimetype = 'image/png'
-    return response    
+    return response
+    
+import pickle
+@app.route('/getpickleddataset.p')
+def getpickleddataset():
+    data = pickle.dumps(tracking_control.tracking_results)
+    response = make_response(data)
+    response.mimetype = 'text/plain'
+    return response
+
 
 @app.route('/findretroreflectors')
 def findretroreflectors():
@@ -154,21 +164,10 @@ def findretroreflectors():
     return "Location: %d %d" % p
 
 
-@app.route('/imagestats')
-def imagestats():
-#    if not startupdone:
-#        return "Not online"
-#    if cam_control.prs.empty():
-#        return "No new image"
-#    pair = cam_control.prs.queue[0]
+@app.route('/imagestats/<int:index>')
+def imagestats(index):
     msg = ""
-#    for img in [0,1]:
-#        msg+= "Image: %d\n" % img
-#        msg+= "  Max: %d\n" % np.max(pair[img].img)
-#        msg+= "  Min: %d\n" % np.min(pair[img].img)
-#        msg+= " Mean: %0.2f\n" % np.mean(pair[img].img)
-    msg+=""
-    msg+=tracking_control.get_status_string()
+    msg+=tracking_control.get_status_string(index)
     return msg
     
 @app.route('/stop')
@@ -191,9 +190,12 @@ def shutdown():
         global blink_control
         blink_control = None
         startupdone = False
+        sys.exit()        
         return "Shutdown Complete"
     else:
+        sys.exit()
         return "System already offline"
+
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0")

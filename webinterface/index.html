@@ -6,7 +6,7 @@
     left:350px;
     top:90px;
     width:300px;
-    height:300px;
+    height:225px;
     background-image:url("nodata.png");
 }
 #config {
@@ -21,7 +21,7 @@
     left:680px;
     top:90px;
     width:300px;
-    height:300px;
+    height:225px;
     background-image:url("nodata.png");
 }
 #noflash_title {
@@ -32,8 +32,12 @@
 #flash_title {
     position:absolute;
     left:680px;
-    top:60px;
-    
+    top:60px; 
+}
+#trackingresults {
+    position:absolute;
+    left:350px;
+    top:350px; 
 }
 </style>
 <head>
@@ -45,7 +49,7 @@
 
 <h3>Bumblebee Tracking System</h3>
 <div id="config">
-<input id="url" value="192.168.1.8:5000" />
+<input id="url" value="10.3.141.1:5000" />
 <button id="startup">Startup</button>
 <br/>
 Capture:
@@ -68,6 +72,8 @@ Gain: <input id="gain" value="0" size="5" />dB<br />
 <button id="set">Set</button>
 <br/>
 Status: <span id="status">Offline</span>
+<br />
+<span>Download: <a id="download" href="#">pickle file</a>.</span>
 </div>
 <span id="noflash_title">No Flash</span>
 <div id="noflash_image">
@@ -75,6 +81,8 @@ Status: <span id="status">Offline</span>
 <span id="flash_title">Flash</span>
 <div id="flash_image">
 </div>
+<span id="trackingresults">[no tracking results]</span>
+
 <script>
 image = 0
 trackingimagecount = 0
@@ -90,6 +98,7 @@ $('button#startup').click(function(){
       },
       error: function(jqXHR, status, errorThrown){$('span#status').text('Startup Error');},
     });
+    $('a#download').attr('href',"http://"+$('input#url').val()+"/getpickleddataset.p");
 });
 $('button#start').click(function(){
     $('span#status').text('Starting...');
@@ -150,9 +159,19 @@ $('button.refreshimages').click(function(){
     url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/0/"+$('input#maxval').val();
     $('#flash_image').css("background-image","url('"+url+"')");
     url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/1/"+$('input#maxval').val();
-    $('#noflash_image').css("background-image","url('"+url+"')");    
-   /* $.ajax({
+    $('#noflash_image').css("background-image","url('"+url+"')");
+    
+    url = "http://"+$('input#url').val()+"/imagestats/"+image
+    $.ajax({
       url: url,
+      success: function(data, status, jqXHR){
+        $('span#trackingresults').text(data);
+      },
+      error: function(jqXHR, status, errorThrown){$('span#status').text('Download tracking results Error');}
+    });
+    
+   /* $.ajax({
+      url: url,/imagestats
       success: function(data, status, jqXHR){
         $('span#status').text('Downloaded');
         if (data=="No new image") {$('span#status').text('No Image');}
