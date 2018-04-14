@@ -11,6 +11,7 @@ import retrodetect as rd
 from flask_cors import CORS
 import base64
 import sys
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -48,14 +49,21 @@ def setinterval(interval):
         blink_control.t = interval
     return "0"
 
-@app.route('/setcamera/<int:exposure>/<int:gain>')
-def setcamera(exposure,gain):
+
+@app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:skipcalc>')
+def setcamera(exposure,gain,blocksize,offset,skipcalc):
     global startupdone
     if not startupdone:
         return "Not online"
     global cam_control
     cam_control.set_exposure(exposure)
     cam_control.set_gain(gain)
+    global tracking_control
+    tracking_control.blocksize = blocksize
+    tracking_control.offset = offset
+    skipcalc = (skipcalc>0)
+    tracking_control.skipcalc = skipcalc
+    
     return "Setup complete"
 
 @app.route('/')
@@ -116,23 +124,44 @@ def gettrackingimagecount():
         return str(len(tracking_control.tracking_results))
     else:
         return "0"
-
+        
+@app.route('/getsystemstatus')
+def getsystemstatus():
+    global startupdone
+    if startupdone:
+        msg = ""
+        msg += "Processing Queue: %d\n" % tracking_control.camera_queue.qsize()
+        cpu_usage_string = os.popen("cat /proc/loadavg").readline()
+        msg += "CPU Usage:        %s" % cpu_usage_string
+        return msg
+    else:
+        return "0"
     
-@app.route('/gettrackingimage/<int:index>/<int:img>/<int:cmax>')
-def gettrackingimage(index,img,cmax):
+@app.route('/gettrackingimage/<int:index>/<int:img>/<int:cmax>/<int:lowres>')
+def gettrackingimage(index,img,cmax,lowres):
     if cmax<1 or cmax>255:
         return "cmax parameter must be between 1 and 255."
     if img<0 or img>1:
         return "image must be 0 or 1"
     if (index>=len(tracking_control.tracking_results)) or (index<0):
-        return "out of rane"
-    pair = tracking_control.tracking_results[index]['lowresimages']
-    fig = Figure(figsize=[3,2.25])
+        return "out of range"
+    
+    if lowres:    
+        pair = tracking_control.tracking_results[index]['lowresimages']
+        fig = Figure(figsize=[3,2.25])        
+    else:
+        pair = tracking_control.tracking_results[index]['highresimages']
+        fig = Figure(figsize=[2,2])
     axis = fig.add_subplot(1, 1, 1)   
     axis.imshow(pair[img],clim=[0,cmax])
-    loc = tracking_control.tracking_results[index]['location']
-    axis.plot(loc[1]/10,loc[0]/10,'w+',markersize=20)
     
+    if lowres:    
+        loc = tracking_control.tracking_results[index]['location']
+        axis.plot(loc[1]/10,loc[0]/10,'w+',markersize=20)
+
+        for i,loc in enumerate(tracking_control.tracking_results[index]['maxvals']):
+            axis.plot(loc['location'][1]/10,loc['location'][0]/10,'b+',markersize=(10/(i+1)))
+
     fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
     canvas = FigureCanvas(fig)
     output = io.BytesIO()
@@ -142,7 +171,7 @@ def gettrackingimage(index,img,cmax):
 
     response.mimetype = 'image/png'
     return response
-    
+
 import pickle
 @app.route('/getpickleddataset.p')
 def getpickleddataset():

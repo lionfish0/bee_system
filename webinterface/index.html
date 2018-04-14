@@ -34,10 +34,38 @@
     left:680px;
     top:60px; 
 }
+
+
+#noflash_image_centre {
+    position:absolute;
+    left:350px;
+    top:350px;
+    width:200px;
+    height:200px;
+    background-image:url("nodata.png");
+}
+#flash_image_centre {
+    position:absolute;
+    left:680px;
+    top:350px;
+    width:200px;
+    height:200px;
+    background-image:url("nodata.png");
+}
+#noflash_title_centre {
+    position:absolute;
+    left:350px;
+    top:330px;
+}
+#flash_title_centre {
+    position:absolute;
+    left:680px;
+    top:330px; 
+}
 #trackingresults {
     position:absolute;
     left:350px;
-    top:350px; 
+    top:550px; 
 }
 </style>
 <head>
@@ -69,7 +97,11 @@ Image threshold: <input id="maxval" size=3 value=10 />
 
 Exposure: <input id="exposure" value="100" size="5" />&mu;s<br />
 Gain: <input id="gain" value="0" size="5" />dB<br />
+Blocksize: <input id="blocksize" value="20" size="5" />pixels<br />
+Offset: <input id="offset" value="3" size="5" />pixels<br />
+SkipCalc: <input id="skipcalc" value="0" size="2" /><br />
 <button id="set">Set</button>
+
 <br/>
 Status: <span id="status">Offline</span>
 <br />
@@ -80,6 +112,12 @@ Status: <span id="status">Offline</span>
 </div>
 <span id="flash_title">Flash</span>
 <div id="flash_image">
+</div>
+<span id="noflash_title_centre">No Flash (centre)</span>
+<div id="noflash_image_centre">
+</div>
+<span id="flash_title_centre">Flash (centre)</span>
+<div id="flash_image_centre">
 </div>
 <span id="trackingresults">[no tracking results]</span>
 
@@ -156,10 +194,15 @@ $('button.refreshimages').click(function(){
     $('span#index').text(image+1);//have to add one as python is zero indexed
     $('span#trackingimagecount').text(trackingimagecount);
     $('span#status').text('Downloading...');
-    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/0/"+$('input#maxval').val();
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/0/"+$('input#maxval').val()+"/1";
     $('#flash_image').css("background-image","url('"+url+"')");
-    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/1/"+$('input#maxval').val();
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/1/"+$('input#maxval').val()+"/1";
     $('#noflash_image').css("background-image","url('"+url+"')");
+    
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/0/"+$('input#maxval').val()+"/0";
+    $('#flash_image_centre').css("background-image","url('"+url+"')");
+    url = "http://"+$('input#url').val()+"/gettrackingimage/"+image+"/1/"+$('input#maxval').val()+"/0";
+    $('#noflash_image_centre').css("background-image","url('"+url+"')");
     
     url = "http://"+$('input#url').val()+"/imagestats/"+image
     $.ajax({
@@ -194,7 +237,7 @@ $('button#setinterval').click(function(){
 });
 $('button#set').click(function(){
     $('span#status').text('Setting...');
-    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val();
+    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+$('input#blocksize').val()+"/"+$('input#offset').val()+"/"+$('input#skipcalc').val();
     $.ajax({
       url: url,
       success: function(data, status, jqXHR){
