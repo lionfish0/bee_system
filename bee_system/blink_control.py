@@ -12,7 +12,7 @@ class Blink_Control:
         self.run_blink = threading.Event()
     
     def worker(self):
-        st = 0.1
+        st = 0.01
         while (True):
             self.run_blink.wait()
             print("Blink Blink...");

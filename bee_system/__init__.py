@@ -37,8 +37,9 @@ def startup(exposure,gain):
     t.start()
     global tracking_control
     tracking_control = Tracking_Control(cam_control.prs)
-    t = threading.Thread(target=tracking_control.worker)
-    t.start()
+    for _ in range(1):
+        t = threading.Thread(target=tracking_control.worker)
+        t.start()        
     startupdone = True
     return "Startup complete"
 
@@ -50,8 +51,8 @@ def setinterval(interval):
     return "0"
 
 
-@app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:skipcalc>')
-def setcamera(exposure,gain,blocksize,offset,skipcalc):
+@app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:stepsize>/<int:skipcalc>')
+def setcamera(exposure,gain,blocksize,offset,stepsize,skipcalc):
     global startupdone
     if not startupdone:
         return "Not online"
@@ -60,6 +61,7 @@ def setcamera(exposure,gain,blocksize,offset,skipcalc):
     cam_control.set_gain(gain)
     global tracking_control
     tracking_control.blocksize = blocksize
+    tracking_control.stepsize = stepsize
     tracking_control.offset = offset
     skipcalc = (skipcalc>0)
     tracking_control.skipcalc = skipcalc
@@ -132,7 +134,10 @@ def getsystemstatus():
         msg = ""
         msg += "Processing Queue: %d\n" % tracking_control.camera_queue.qsize()
         cpu_usage_string = os.popen("cat /proc/loadavg").readline()
-        msg += "CPU Usage:        %s" % cpu_usage_string
+        msg += "CPU Usage:        %s" % cpu_usage_string        
+        if len(tracking_control.tracking_results)>0:
+            msg += "\n\nDiagnostic Message from last tracking computation\n"
+            msg += "<pre>"+tracking_control.tracking_results[-1]['msg']+"</pre>"
         return msg
     else:
         return "0"
@@ -155,13 +160,21 @@ def gettrackingimage(index,img,cmax,lowres):
     axis = fig.add_subplot(1, 1, 1)   
     axis.imshow(pair[img],clim=[0,cmax])
     
+    
+    
     if lowres:    
-        loc = tracking_control.tracking_results[index]['location']
-        axis.plot(loc[1]/10,loc[0]/10,'w+',markersize=20)
-
+        marker = 'w+'
         for i,loc in enumerate(tracking_control.tracking_results[index]['maxvals']):
-            axis.plot(loc['location'][1]/10,loc['location'][0]/10,'b+',markersize=(10/(i+1)))
-
+            axis.plot(loc['location'][1]/10,loc['location'][0]/10,marker,markersize=(10/(i+1)))
+            if i>3: marker = 'b+'
+            axis.plot(loc['location'][1]/10,loc['location'][0]/10,'xw',markersize=(loc['score']/5))            
+    else:
+        if img==0:
+            #shift = tracking_control.tracking_results[index]['shift']
+            axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
+        if img==1:
+            axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
+            
     fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
     canvas = FigureCanvas(fig)
     output = io.BytesIO()

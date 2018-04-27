@@ -98,6 +98,7 @@ Image threshold: <input id="maxval" size=3 value=10 />
 Exposure: <input id="exposure" value="100" size="5" />&mu;s<br />
 Gain: <input id="gain" value="0" size="5" />dB<br />
 Blocksize: <input id="blocksize" value="20" size="5" />pixels<br />
+Stepsize: <input id="stepsize" value="10" size="5" />pixels<br />
 Offset: <input id="offset" value="3" size="5" />pixels<br />
 SkipCalc: <input id="skipcalc" value="0" size="2" /><br />
 <button id="set">Set</button>
@@ -237,7 +238,7 @@ $('button#setinterval').click(function(){
 });
 $('button#set').click(function(){
     $('span#status').text('Setting...');
-    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+$('input#blocksize').val()+"/"+$('input#offset').val()+"/"+$('input#skipcalc').val();
+    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+$('input#blocksize').val()+"/"+$('input#offset').val()+"/"+$('input#stepsize').val()+"/"+$('input#skipcalc').val();
     $.ajax({
       url: url,
       success: function(data, status, jqXHR){

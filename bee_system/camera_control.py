@@ -30,12 +30,15 @@ class PhotoResult():
         self.buffer = self.stream.timeout_pop_buffer(timeout) #blocking
         if self.buffer is None:
             self.ok = False
-            print("failed")
+            print("buffer read failed")
+            self.returnbuffer() #?
             return
         
         self.status = self.buffer.get_status()
         if self.status!=0:
-            print("failed")
+            print("failed status error")
+            print("Status:")
+            print(self.status)
             self.ok = False
             self.returnbuffer()
             return
@@ -78,7 +81,7 @@ class Camera_Control():
         print("Starting Acquisition")
         self.camera.start_acquisition ()
         print("Creating stream buffer")
-        for i in range(0,8):
+        for i in range(0,20):
             self.stream.push_buffer (Aravis.Buffer.new_allocate(self.payload))
         print("Done")    
         self.prs = queue.Queue()
@@ -111,7 +114,7 @@ class Camera_Control():
             skip = False
             print("")
             print("Awaiting photo pair:")
-            timeouts = [10000000000,500000]#in us: 10000s or 0.5s
+            timeouts = [10000000000,2000000]#in us: 10000s or 1s
             for i in [0,1]:
                 pr[i] = PhotoResult(self.stream)
                 print("Awaiting photo %d" % i)
