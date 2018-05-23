@@ -6,6 +6,7 @@ import pickle
 import ctypes
 import numpy as np
 import queue
+import gc
 
 ###TODO Write a class that stores the camera etc
 ###TODO Rename file to avoid name collision with camera
@@ -23,6 +24,8 @@ class PhotoResult():
         """This must be called after data used so more images can be taken"""
         if self.buffer:
             self.stream.push_buffer(self.buffer) #return it to the buffer
+        self.img = None #ensure we've no pointers at this data
+        gc.collect()
             
     def get_photo(self,timeout):
         """Blocking: Stores an image in self.img"""
@@ -81,7 +84,7 @@ class Camera_Control():
         print("Starting Acquisition")
         self.camera.start_acquisition ()
         print("Creating stream buffer")
-        for i in range(0,20):
+        for i in range(0,8):
             self.stream.push_buffer (Aravis.Buffer.new_allocate(self.payload))
         print("Done")    
         self.prs = queue.Queue()

@@ -3,8 +3,6 @@ import retrodetect as rd
 import time
 
 def ascii_draw(mat):
-    print("DRAWING")
-    print(mat)
     symbols = np.array([s for s in ' .,:-=+*X#@'])[::-1]
     msg = ""    
     mat = (11*mat/(np.max(mat)+1)).astype(int)
@@ -50,10 +48,7 @@ def erase_around(mat,x,y,extent=7):
   #  for i in range(max(x-erase_extent,0),min(x+erase_extent,mat.shape[0])):
   #      for j in range(max(y-erase_extent,0),min(y+erase_extent,mat.shape[1])):
   #          mat[i,j] = 0
-            
-    print("Erased pixels: ")
-    print(erased_pixels.shape)
-    print(erased_pixels)
+    
     return erased_pixels
     
     
@@ -85,26 +80,33 @@ class Tracking_Control():
     def worker(self):
         searchbox = 100
         while True:
-            print("Awaiting image for processing..")
+            #Awaiting image for processing [blocking]
             pair = self.camera_queue.get()
-            print("Processing...")
+
+
             starttime = time.time()
             msg = ""
             msg += "Processing Images\n"
             msg += "Computing Shift\n"
+            
             shift = rd.getshift(pair[0].img,pair[1].img,step=self.stepsize,searchbox=searchbox)
             msg += "    shift: %d %d\n" % (shift[0], shift[1])
             msg += "time: %0.4f\n" % (time.time()-starttime)
             msg += "Computing output non-flash blocked image\n"
-            out_img = rd.getblockmaxedimage(pair[1].img,self.blocksize,self.offset)
+            if not self.skipcalc:
+                out_img = rd.getblockmaxedimage(pair[1].img,self.blocksize,self.offset)
+            else:
+                out_img = pair[1].img
+                
             msg += "time: %0.4f\n" % (time.time()-starttime)
+            
             if not self.skipcalc:
                 msg+="Aligning and subtracting\n"
                 done = rd.alignandsubtract(out_img,shift,pair[0].img)
                 msg += "time: %0.4f\n" % (time.time()-starttime)
                 
                 maxvals = []
-                for it in range(10):
+                for it in range(1):
                     print(".")
                     argmax = done.argmax()
                     p = np.array(np.unravel_index(argmax, done.shape))
@@ -118,26 +120,28 @@ class Tracking_Control():
                         continue #can't use this one
                     
                     maxvals.append({'val':maxval, 'location':p.copy(), 'sample_img':peak_sample_img,'score':score})
+                    msg += " - Preparing stats"
                     msg += "peak at [%d, %d] = %d [score=%0.5f]\n" % (p[0],p[1],maxval,score)
                     msg += ascii_draw(peak_sample_img)
                     msg += "\n"
-                    
+                    msg += "time: %0.4f\n" % (time.time()-starttime)
+                 
                 msg += "time: %0.4f\n" % (time.time()-starttime)                    
                 lowresimages = []
-                print("Generating low res images")
+                #print("Generating low res images")
                 msg += " - Generating low res images\n"
                 for img in [0,1]:
-                    print("Image %d" % img)
+                    #print("Image %d" % img)
                     #lowresimages.append(pair[img].img[::10,::10].copy())
                     if img==0:
-                        #lowresimages.append(pair[img].img[::10,::10].copy())
-                        lowresimages.append(rd.getblockmaxedimage(pair[img].img,10,1)[::10,::10])
+                        lowresimages.append(pair[img].img[::10,::10].copy())
+                        #lowresimages.append(rd.getblockmaxedimage(pair[img].img,10,1)[::10,::10])
                     else:
                         #lowresimages.append(out_img[::10,::10].copy()) 
-                        
-                        lowresimages.append(rd.shiftimg(out_img,shift,cval=255)[::10,::10]) 
+                        #lowresimages.append(None)
+                        lowresimages.append(rd.shiftimg(out_img,shift,cval=255)[::10,::10].copy()) 
                     #lowresimages.append(rd.getblockmaxedimage(pair[img].img)[::10,::10])
-                msg += "time: %0.4f\n" % (time.time()-starttime)
+                    msg += "time: %0.4f\n" % (time.time()-starttime)
                     
             else:
                 print("Skipping compute")
@@ -156,12 +160,19 @@ class Tracking_Control():
                     im = rd.shiftimg(im,shift,cval=255)
                 s = im.shape
                 highresimages.append(im[s[0]/2-100:s[0]/2+100,s[1]/2-100:s[1]/2+100].copy())
+                
+            #self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
             self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
+             
+            
+            
 
             msg += "time: %0.4f\n" % (time.time()-starttime)    
-            msg += "Recording Complete\n Returning Buffers\n"            
+                
+            msg += "Recording Complete\n Returning Buffers\n"             
             pair[0].returnbuffer()
             pair[1].returnbuffer()
             msg += "time: %0.4f\n" % (time.time()-starttime)    
             msg += "Buffers returned\n"            
             self.tracking_results[-1]['msg'] = msg
+

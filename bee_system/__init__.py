@@ -12,6 +12,7 @@ from flask_cors import CORS
 import base64
 import sys
 import os
+from mem_top import mem_top
 
 app = Flask(__name__)
 CORS(app)
@@ -138,6 +139,7 @@ def getsystemstatus():
         if len(tracking_control.tracking_results)>0:
             msg += "\n\nDiagnostic Message from last tracking computation\n"
             msg += "<pre>"+tracking_control.tracking_results[-1]['msg']+"</pre>"
+        msg+="\n\n+<pre>"+mem_top()+"</pre>"
         return msg
     else:
         return "0"
