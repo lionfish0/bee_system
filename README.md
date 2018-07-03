@@ -21,3 +21,18 @@ The full system to run on the flight raspberry pi
     pip install Flask
 
 
+# Running it
+
+<pre>export GI_TYPELIB_PATH=$GI_TYPELIB_PATH:/home/pi/aravis/src
+export LD_LIBRARY_PATH=/home/pi/aravis/src/.libs
+
+cd /home/pi/bee_system/webinterface 
+/usr/bin/python3 -m http.server &
+
+
+
+while :
+do
+	echo "RESTARTING!!!"
+	/usr/bin/python3 /home/pi/bee_system/bee_system/__init__.py
+done</pre>
