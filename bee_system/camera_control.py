@@ -47,7 +47,7 @@ class PhotoResult():
             return
         print("Success")
         self.ok = True #success
-        raw = np.frombuffer(self.buffer.get_data(),dtype="B1").astype(float)
+        raw = np.frombuffer(self.buffer.get_data(),dtype=np.uint8).astype(float)
         self.img = np.reshape(raw,[1544,2064])
 
 class Camera_Control():
