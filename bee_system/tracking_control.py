@@ -159,7 +159,7 @@ class Tracking_Control():
                 if img == 1:
                     im = rd.shiftimg(im,shift,cval=255)
                 s = im.shape
-                highresimages.append(im[s[0]/2-100:s[0]/2+100,s[1]/2-100:s[1]/2+100].copy())
+                highresimages.append(im[int(s[0]/2-100):int(s[0]/2+100),int(s[1]/2-100):int(s[1]/2+100)].copy())
                 
             #self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
             self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
