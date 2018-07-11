@@ -7,7 +7,6 @@ import ctypes
 import numpy as np
 import queue
 import gc
-
 ###TODO Write a class that stores the camera etc
 ###TODO Rename file to avoid name collision with camera
 ###Check class methods work with threading
@@ -29,8 +28,9 @@ class PhotoResult():
             
     def get_photo(self,timeout):
         """Blocking: Stores an image in self.img"""
-        print("Awaiting Image from camera (timeout=%d)" % timeout)
-        self.buffer = self.stream.timeout_pop_buffer(timeout) #blocking
+        #print("Awaiting Image from camera (timeout=%0.2fs)" % (timeout/1e6))
+#        self.buffer = self.stream.timeout_pop_buffer(timeout) #blocking
+        self.buffer = self.stream.pop_buffer() #blocking
         if self.buffer is None:
             self.ok = False
             print("buffer read failed")
@@ -39,13 +39,13 @@ class PhotoResult():
         
         self.status = self.buffer.get_status()
         if self.status!=0:
-            print("failed status error")
-            print("Status:")
+            #print("failed status error")
+            #print("Status:")
             print(self.status)
             self.ok = False
             self.returnbuffer()
             return
-        print("Success")
+        #print("Success")
         self.ok = True #success
         raw = np.frombuffer(self.buffer.get_data(),dtype=np.uint8).astype(float)
         self.img = np.reshape(raw,[1544,2064])
@@ -67,6 +67,9 @@ class Camera_Control():
         Aravis.enable_interface ("Fake")
         self.camera = Aravis.Camera.new (None)
         self.camera.set_region (0,0,2064,1544) #2064x1544
+        print("Old packet size: %d" % self.camera.gv_get_packet_size())
+        self.camera.gv_set_packet_size(1024)
+        print("New packet size: %d" % self.camera.gv_get_packet_size())
         #camera.set_binning(1,1) #basically disable
         #camera.set_frame_rate (10.0)
         self.camera.set_exposure_time(exposure)#us
@@ -84,7 +87,7 @@ class Camera_Control():
         print("Starting Acquisition")
         self.camera.start_acquisition ()
         print("Creating stream buffer")
-        for i in range(0,8):
+        for i in range(0,50):
             self.stream.push_buffer (Aravis.Buffer.new_allocate(self.payload))
         print("Done")    
         self.prs = queue.Queue()
@@ -93,6 +96,7 @@ class Camera_Control():
         print("Camera vendor : %s" %(self.camera.get_vendor_name ()))
         print("Camera model  : %s" %(self.camera.get_model_name ()))
         print("Camera id     : %s" %(self.camera.get_device_id ()))
+        print("Acquisit. mode: %s" %(self.camera.get_acquisition_mode ()))
         print("ROI           : %dx%d at %d,%d" %(self.width, self.height, self.x, self.y))
         print("Payload       : %d" %(self.payload))
         print("Pixel format  : %s" %(self.camera.get_pixel_format_as_string ()))
@@ -115,19 +119,25 @@ class Camera_Control():
         while True:
             pr = [None,None]
             skip = False
-            print("")
-            print("Awaiting photo pair:")
-            timeouts = [10000000000,2000000]#in us: 10000s or 1s
+            #print("")
+            #print("Debug info: Number of stream buffers")
+            #print(self.stream.get_n_buffers())
+            #print(self.stream.get_statistics())
+            #print("Awaiting photo pair:")
+            timeouts = [4000000,2000000]#in us: 10000s or 1s
             for i in [0,1]:
                 pr[i] = PhotoResult(self.stream)
-                print("Awaiting photo %d" % i)
+                #print("Awaiting photo %d" % i)
                 pr[i].get_photo(timeouts[i]) #blocking
-                print("Got Photo %d of pair" % i)
-                print("Status: %d" % pr[i].status)
+                #print("Got Photo %d of pair" % i)
+                #print("Status: %d" % pr[i].status)
+
+            streamsin, streamsout = self.stream.get_n_buffers()
             if pr[0].ok and pr[1].ok:
-                print("Both ok, saving")
+                print("o  Both ok, saving (%d, %d)" % (streamsin, streamsout))
                 self.prs.put(pr)
             else:
+                print("x  Failed (%d, %d)" % (streamsin, streamsout))
                 pr[0].returnbuffer()
                 pr[1].returnbuffer()                
                 

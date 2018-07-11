@@ -21,6 +21,10 @@ startupdone = False
 cam_control = None
 tracking_control = None
 
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 @app.route('/startup/<int:exposure>/<int:gain>')
 def startup(exposure,gain):
     global startupdone
@@ -44,6 +48,7 @@ def startup(exposure,gain):
     startupdone = True
     return "Startup complete"
 
+@app.route('/setinterval/<float:interval>')
 @app.route('/setinterval/<int:interval>')
 def setinterval(interval):
     if startupdone:

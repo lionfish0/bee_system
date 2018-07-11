@@ -12,21 +12,21 @@ class Blink_Control:
         self.run_blink = threading.Event()
     
     def worker(self):
-        st = 0.01
+        st = 0.03
         while (True):
             self.run_blink.wait()
-            print("Blink Blink...");
+            #print("Blink Blink...");
             GPIO.output(5,True)
             time.sleep(st)
             GPIO.output(3,True)
             time.sleep(st)
             GPIO.output(3,False)
-            time.sleep(st/2)
+            time.sleep(st)
             GPIO.output(5,False)
-            time.sleep(st/2)
+            time.sleep(st)
             GPIO.output(3,True)
             time.sleep(st)
             GPIO.output(3,False)
             time.sleep(st)
-            time.sleep(self.t)
+            time.sleep(self.t-st*6)
 
