@@ -32,7 +32,7 @@ def erase_around(mat,x,y,extent=7):
     Erase [default 5] pixels around x,y in mat (set to zero).
     Returns these pixels
     """
-    print("Erasing around %d,%d" % (x,y))
+    #print("Erasing around %d,%d" % (x,y))
     startx = x-extent
     endx = x+extent
     starty = y-extent
@@ -81,6 +81,7 @@ class Tracking_Control():
         searchbox = 100
         while True:
             #Awaiting image for processing [blocking]
+            print("Waiting for image from camera control...")
             pair = self.camera_queue.get()
 
 
@@ -89,25 +90,25 @@ class Tracking_Control():
             msg += "Processing Images\n"
             msg += "Computing Shift\n"
             
-            shift = rd.getshift(pair[0].img,pair[1].img,step=self.stepsize,searchbox=searchbox)
+            shift = rd.getshift(pair[0],pair[1],step=self.stepsize,searchbox=searchbox)
             msg += "    shift: %d %d\n" % (shift[0], shift[1])
             msg += "time: %0.4f\n" % (time.time()-starttime)
             msg += "Computing output non-flash blocked image\n"
             if not self.skipcalc:
-                out_img = rd.getblockmaxedimage(pair[1].img,self.blocksize,self.offset)
+                out_img = rd.getblockmaxedimage(pair[1],self.blocksize,self.offset)
             else:
-                out_img = pair[1].img
+                out_img = pair[1]
                 
             msg += "time: %0.4f\n" % (time.time()-starttime)
             
             if not self.skipcalc:
                 msg+="Aligning and subtracting\n"
-                done = rd.alignandsubtract(out_img,shift,pair[0].img)
+                done = rd.alignandsubtract(out_img,shift,pair[0])
                 msg += "time: %0.4f\n" % (time.time()-starttime)
                 
                 maxvals = []
                 for it in range(1):
-                    print(".")
+                    #print(".")
                     argmax = done.argmax()
                     p = np.array(np.unravel_index(argmax, done.shape))
                     maxval = done[p[0],p[1]]
@@ -115,7 +116,7 @@ class Tracking_Control():
                     score = score_img(peak_sample_img)
                     p += searchbox
                     if (p[0]>=done.shape[0]) or (p[1]>=done.shape[1]):
-                        print("error (out of range) location")
+                        #print("error (out of range) location")
                         msg+="  [error (out of range) location]\n"
                         continue #can't use this one
                     
@@ -132,19 +133,19 @@ class Tracking_Control():
                 msg += " - Generating low res images\n"
                 for img in [0,1]:
                     #print("Image %d" % img)
-                    #lowresimages.append(pair[img].img[::10,::10].copy())
+                    #lowresimages.append(pair[img][::10,::10].copy())
                     if img==0:
-                        lowresimages.append(pair[img].img[::10,::10].copy())
-                        #lowresimages.append(rd.getblockmaxedimage(pair[img].img,10,1)[::10,::10])
+                        lowresimages.append(pair[img][::10,::10].copy())
+                        #lowresimages.append(rd.getblockmaxedimage(pair[img],10,1)[::10,::10])
                     else:
                         #lowresimages.append(out_img[::10,::10].copy()) 
                         #lowresimages.append(None)
                         lowresimages.append(rd.shiftimg(out_img,shift,cval=255)[::10,::10].copy()) 
-                    #lowresimages.append(rd.getblockmaxedimage(pair[img].img)[::10,::10])
+                    #lowresimages.append(rd.getblockmaxedimage(pair[img])[::10,::10])
                     msg += "time: %0.4f\n" % (time.time()-starttime)
                     
             else:
-                print("Skipping compute")
+                #print("Skipping compute")
                 maxvals = []
                 lowresimages = []
                 shift = [np.nan,np.nan]
@@ -152,10 +153,10 @@ class Tracking_Control():
             
             msg += "Computation Complete, recording\n"
             msg += "time: %0.4f\n" % (time.time()-starttime)                    
-            print("Computation Complete, saving")  
+            #print("Computation Complete, saving")  
             highresimages = []
             for img in [0,1]:
-                im = pair[img].img
+                im = pair[img]
                 if img == 1:
                     im = rd.shiftimg(im,shift,cval=255)
                 s = im.shape
@@ -169,9 +170,10 @@ class Tracking_Control():
 
             msg += "time: %0.4f\n" % (time.time()-starttime)    
                 
-            msg += "Recording Complete\n Returning Buffers\n"             
-            pair[0].returnbuffer()
-            pair[1].returnbuffer()
+            msg += "Recording Complete\n Returning Buffers\n"
+            pair = None #erase
+            #pair[0].returnbuffer()
+            #pair[1].returnbuffer()
             msg += "time: %0.4f\n" % (time.time()-starttime)    
             msg += "Buffers returned\n"            
             self.tracking_results[-1]['msg'] = msg

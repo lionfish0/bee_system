@@ -2,6 +2,7 @@ from flask import Flask, make_response
 from bee_system.blink_control import Blink_Control, configure_gpio
 from bee_system.camera_control import Camera_Control
 from bee_system.tracking_control import Tracking_Control
+import multiprocessing
 import threading
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -33,28 +34,32 @@ def startup(exposure,gain):
     configure_gpio()
     global blink_control
     blink_control = Blink_Control()
-    t = threading.Thread(target=blink_control.worker)#,args=(blink_control.run_blink,))
+    t = multiprocessing.Process(target=blink_control.worker)#,args=(blink_control.run_blink,))
     t.start()
     global cam_control
-    cam_control = Camera_Control(exposure,gain)
-    cam_control.print_status()
-    t = threading.Thread(target=cam_control.worker)
+    cam_control = Camera_Control()
+    t = multiprocessing.Process(target=cam_control.worker,args=(exposure,gain))
     t.start()
     global tracking_control
     tracking_control = Tracking_Control(cam_control.prs)
-    for _ in range(1):
-        t = threading.Thread(target=tracking_control.worker)
-        t.start()        
+    #t = multiprocessing.Process(target=tracking_control.worker)
+    t = threading.Thread(target=tracking_control.worker)
+    t.start()        
     startupdone = True
+    print("Startup Complete")
     return "Startup complete"
 
 @app.route('/setinterval/<float:interval>')
-@app.route('/setinterval/<int:interval>')
 def setinterval(interval):
+    print("Set interval %0.2f" % interval)
     if startupdone:
         global blink_control
-        blink_control.t = interval
+        blink_control.t.value = interval
     return "0"
+    
+@app.route('/setinterval/<int:interval>')
+def setinterval_int(interval):
+    setinterval(1.0*interval)
 
 
 @app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:stepsize>/<int:skipcalc>')
@@ -80,7 +85,9 @@ def hello_world():
 
 @app.route('/start')
 def start():
+    print("Start")
     global blink_control
+    print("Setting blink control")
     blink_control.run_blink.set()
     return "Blinking Started"
 
