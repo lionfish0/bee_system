@@ -1,6 +1,8 @@
 import numpy as np
 import retrodetect as rd
 import time
+from multiprocessing import Queue, Value
+import threading
 
 def ascii_draw(mat):
     symbols = np.array([s for s in ' .,:-=+*X#@'])[::-1]
@@ -53,17 +55,24 @@ def erase_around(mat,x,y,extent=7):
     
     
 class Tracking_Control():
-    def __init__(self,camera_queue):
+    def __init__(self,camera_queue,tracking_results=[]):
         """
         ...
         """
         print("Creating Tracking Object")
         self.camera_queue = camera_queue
-        self.tracking_results = []
-        self.blocksize = 30
-        self.offset = 2
-        self.stepsize = 10
-        self.skipcalc = False
+        self.tracking_results_queue = Queue()
+        self.tracking_results = tracking_results
+        self.blocksize = Value('i',30)
+        self.offset = Value('i',2)
+        self.stepsize = Value('i',10)
+        self.skipcalc = Value('b',False)
+        t = threading.Thread(target=self.fill_tracking_results)
+        t.start()
+    def fill_tracking_results(self):
+        """Just moves stuff from the queue into the list"""
+        while True:
+            self.tracking_results.append(self.tracking_results_queue.get())
     
     def get_status_string(self,index):
         if index>=len(self.tracking_results): return "index greater than maximum tracked image"
@@ -78,30 +87,32 @@ class Tracking_Control():
         return msg
 
     def worker(self):
+        import os
+        os.nice(20) #these shouldn't be priorities
         searchbox = 100
         while True:
             #Awaiting image for processing [blocking]
-            print("Waiting for image from camera control...")
+            print("Waiting for image from camera control...(skipcalc=%d)" % self.skipcalc.value)
             pair = self.camera_queue.get()
 
 
             starttime = time.time()
             msg = ""
             msg += "Processing Images\n"
-            msg += "Computing Shift\n"
-            
-            shift = rd.getshift(pair[0],pair[1],step=self.stepsize,searchbox=searchbox)
+            msg += "time: %0.4f\n" % (time.time()-starttime)
+            msg += "Computing Shift (stepsize=%d)\n" % self.stepsize.value
+            shift = rd.getshift(pair[0],pair[1],step=self.stepsize.value,searchbox=searchbox)
             msg += "    shift: %d %d\n" % (shift[0], shift[1])
             msg += "time: %0.4f\n" % (time.time()-starttime)
             msg += "Computing output non-flash blocked image\n"
-            if not self.skipcalc:
-                out_img = rd.getblockmaxedimage(pair[1],self.blocksize,self.offset)
+            if not self.skipcalc.value:
+                out_img = rd.getblockmaxedimage(pair[1],self.blocksize.value,self.offset.value)
             else:
                 out_img = pair[1]
                 
             msg += "time: %0.4f\n" % (time.time()-starttime)
             
-            if not self.skipcalc:
+            if not self.skipcalc.value:
                 msg+="Aligning and subtracting\n"
                 done = rd.alignandsubtract(out_img,shift,pair[0])
                 msg += "time: %0.4f\n" % (time.time()-starttime)
@@ -161,20 +172,22 @@ class Tracking_Control():
                     im = rd.shiftimg(im,shift,cval=255)
                 s = im.shape
                 highresimages.append(im[int(s[0]/2-100):int(s[0]/2+100),int(s[1]/2-100):int(s[1]/2+100)].copy())
-                
+            msg += "time: %0.4f\n" % (time.time()-starttime)
             #self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
-            self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
+            self.tracking_results_queue.put({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift,'msg':msg})
              
             
             
 
-            msg += "time: %0.4f\n" % (time.time()-starttime)    
-                
-            msg += "Recording Complete\n Returning Buffers\n"
-            pair = None #erase
-            #pair[0].returnbuffer()
-            #pair[1].returnbuffer()
-            msg += "time: %0.4f\n" % (time.time()-starttime)    
-            msg += "Buffers returned\n"            
-            self.tracking_results[-1]['msg'] = msg
+            #msg += "time: %0.4f\n" % (time.time()-starttime)    
+            #    
+            #msg += "Recording Complete\n Returning Buffers\n"
+            #pair = None #erase
+#            pair[0].returnbuffer()
+#            pair[1].returnbuffer()
+            pair = None
+            #msg += "time: %0.4f\n" % (time.time()-starttime)    
+            #msg += "Buffers returned\n"            
+            #self.tracking_results[-1]['msg'] = msg
+            print("Processing Complete")
 

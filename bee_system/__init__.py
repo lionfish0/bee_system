@@ -20,7 +20,7 @@ CORS(app)
 
 startupdone = False
 cam_control = None
-tracking_control = None
+tracking_controls = []
 
 import logging
 log = logging.getLogger('werkzeug')
@@ -40,11 +40,13 @@ def startup(exposure,gain):
     cam_control = Camera_Control()
     t = multiprocessing.Process(target=cam_control.worker,args=(exposure,gain))
     t.start()
-    global tracking_control
-    tracking_control = Tracking_Control(cam_control.prs)
-    #t = multiprocessing.Process(target=tracking_control.worker)
-    t = threading.Thread(target=tracking_control.worker)
-    t.start()        
+    global tracking_controls
+    tracking_results = []
+    for i in range(3): #sets of processes analysing the images:
+        tracking_control = Tracking_Control(cam_control.prs,tracking_results)
+        t = multiprocessing.Process(target=tracking_control.worker)
+        t.start()
+        tracking_controls.append(tracking_control)
     startupdone = True
     print("Startup Complete")
     return "Startup complete"
@@ -59,23 +61,27 @@ def setinterval(interval):
     
 @app.route('/setinterval/<int:interval>')
 def setinterval_int(interval):
-    setinterval(1.0*interval)
+    return setinterval(1.0*interval)
 
 
 @app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:stepsize>/<int:skipcalc>')
 def setcamera(exposure,gain,blocksize,offset,stepsize,skipcalc):
+
     global startupdone
     if not startupdone:
         return "Not online"
-    global cam_control
+    global cam_control    
+    print("Setting camera parameters")    
     cam_control.set_exposure(exposure)
     cam_control.set_gain(gain)
-    global tracking_control
-    tracking_control.blocksize = blocksize
-    tracking_control.stepsize = stepsize
-    tracking_control.offset = offset
-    skipcalc = (skipcalc>0)
-    tracking_control.skipcalc = skipcalc
+    global tracking_controls
+    print("Setting tracking parameters")
+    for tracking_control in tracking_controls:
+        tracking_control.blocksize.value = blocksize
+        tracking_control.stepsize.value = stepsize
+        tracking_control.offset.value = offset
+        skipcalc = (skipcalc>0)
+        tracking_control.skipcalc.value = skipcalc
     
     return "Setup complete"
 
@@ -136,7 +142,7 @@ def getcurrentimage(img,cmax):
 def gettrackingimagecount():
     global startupdone
     if startupdone:
-        return str(len(tracking_control.tracking_results))
+        return str(len(tracking_controls[0].tracking_results))
     else:
         return "0"
         
@@ -145,12 +151,12 @@ def getsystemstatus():
     global startupdone
     if startupdone:
         msg = ""
-        msg += "Processing Queue: %d\n" % tracking_control.camera_queue.qsize()
+        msg += "Processing Queue: %d\n" % tracking_controls[0].camera_queue.qsize()
         cpu_usage_string = os.popen("cat /proc/loadavg").readline()
         msg += "CPU Usage:        %s" % cpu_usage_string        
-        if len(tracking_control.tracking_results)>0:
+        if len(tracking_controls[0].tracking_results)>0:
             msg += "\n\nDiagnostic Message from last tracking computation\n"
-            msg += "<pre>"+tracking_control.tracking_results[-1]['msg']+"</pre>"
+            msg += "<pre>"+tracking_controls[0].tracking_results[-1]['msg']+"</pre>"
         msg+="\n\n+<pre>"+mem_top()+"</pre>"
         return msg
     else:
@@ -162,14 +168,14 @@ def gettrackingimage(index,img,cmax,lowres):
         return "cmax parameter must be between 1 and 255."
     if img<0 or img>1:
         return "image must be 0 or 1"
-    if (index>=len(tracking_control.tracking_results)) or (index<0):
+    if (index>=len(tracking_controls[0].tracking_results)) or (index<0):
         return "out of range"
     
     if lowres:    
-        pair = tracking_control.tracking_results[index]['lowresimages']
+        pair = tracking_controls[0].tracking_results[index]['lowresimages']
         fig = Figure(figsize=[3,2.25])        
     else:
-        pair = tracking_control.tracking_results[index]['highresimages']
+        pair = tracking_controls[0].tracking_results[index]['highresimages']
         fig = Figure(figsize=[2,2])
     axis = fig.add_subplot(1, 1, 1)   
     axis.imshow(pair[img],clim=[0,cmax])
@@ -178,13 +184,13 @@ def gettrackingimage(index,img,cmax,lowres):
     
     if lowres:    
         marker = 'w+'
-        for i,loc in enumerate(tracking_control.tracking_results[index]['maxvals']):
+        for i,loc in enumerate(tracking_controls[0].tracking_results[index]['maxvals']):
             axis.plot(loc['location'][1]/10,loc['location'][0]/10,marker,markersize=(10/(i+1)))
             if i>3: marker = 'b+'
             axis.plot(loc['location'][1]/10,loc['location'][0]/10,'xw',markersize=(loc['score']/5))            
     else:
         if img==0:
-            #shift = tracking_control.tracking_results[index]['shift']
+            #shift = tracking_controls[0].tracking_results[index]['shift']
             axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
         if img==1:
             axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
@@ -202,28 +208,28 @@ def gettrackingimage(index,img,cmax,lowres):
 import pickle
 @app.route('/getpickleddataset.p')
 def getpickleddataset():
-    data = pickle.dumps(tracking_control.tracking_results)
+    data = pickle.dumps(tracking_controls[0].tracking_results)
     response = make_response(data)
     response.mimetype = 'text/plain'
     return response
 
 
-@app.route('/findretroreflectors')
-def findretroreflectors():
-    if not startupdone:
-        return "Not online"
-    pair = cam_control.prs.queue[0]
-    shift = rd.getshift(pair[0].img,pair[1].img)
-    out_img = rd.getblockmaxedimage(pair[1].img)
-    done = rd.alignandsubtract(out_img,shift,pair[0].img)    
-    p = np.unravel_index(done.argmax(), done.shape)
-    return "Location: %d %d" % p
+#@app.route('/findretroreflectors')
+#def findretroreflectors():
+#    if not startupdone:
+#        return "Not online"
+#    pair = cam_control.prs.queue[0]
+#    shift = rd.getshift(pair[0].img,pair[1].img)
+#    out_img = rd.getblockmaxedimage(pair[1].img)
+#    done = rd.alignandsubtract(out_img,shift,pair[0].img)    
+#    p = np.unravel_index(done.argmax(), done.shape)
+#    return "Location: %d %d" % p
 
 
 @app.route('/imagestats/<int:index>')
 def imagestats(index):
     msg = ""
-    msg+=tracking_control.get_status_string(index)
+    msg+=tracking_controls[0].get_status_string(index)
     return msg
     
 @app.route('/stop')

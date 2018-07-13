@@ -6,6 +6,7 @@ import pickle
 import ctypes
 import numpy as np
 from multiprocessing import Queue
+import threading
 #import queue
 import gc
 ###TODO Write a class that stores the camera etc
@@ -53,10 +54,11 @@ class PhotoResult():
 
 class Camera_Control():
     def set_exposure(self,exposure):
-        pass #to do
+        print("set exposure")
+        self.camera_config_queue.put({'instruction':'exposure', 'exposure':exposure})
         
     def set_gain(self,gain):
-        pass #to do
+        self.camera_config_queue.put({'instruction':'gain', 'gain':gain})
 
     def print_status(self,camera):
         print("Camera vendor : %s" %(camera.get_vendor_name ()))
@@ -66,8 +68,21 @@ class Camera_Control():
         print("Pixel format  : %s" %(camera.get_pixel_format_as_string ()))
      
     def __init__(self):
-        self.prs = Queue()   
-        
+        self.prs = Queue()
+        self.camera_config_queue = Queue()
+          
+    def camera_config_worker(self,camera):#awkwardly need this to allow other processes to update camera config
+        print("Camera config worker started")
+        while True:
+            command = self.camera_config_queue.get()
+            print("received command")
+            if command['instruction']=='exposure':
+                camera.set_exposure_time(command['exposure'])
+            if command['instruction']=='gain':
+                camera.set_gain(command['gain'])
+            print(command)
+                
+                
     def worker(self,exposure=500,gain=0):
         """
         exposure (in us, default 500us)
@@ -89,6 +104,8 @@ class Camera_Control():
         camera.set_gain(gain)
         camera.set_pixel_format (Aravis.PIXEL_FORMAT_MONO_8)
         camera.set_trigger("Line1")
+        t = threading.Thread(target=self.camera_config_worker,args=(camera,))
+        t.start()
         self.print_status(camera)
         print("Getting payload object")
         payload = camera.get_payload ()
@@ -100,7 +117,7 @@ class Camera_Control():
         print("Starting Acquisition")
         camera.start_acquisition ()
         print("Creating stream buffer")
-        for i in range(0,50):
+        for i in range(0,8):
             stream.push_buffer (Aravis.Buffer.new_allocate(payload))
         print("Done")    
         
