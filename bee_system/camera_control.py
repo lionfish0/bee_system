@@ -9,6 +9,7 @@ from multiprocessing import Queue
 import threading
 #import queue
 import gc
+from datetime import datetime as dt
 ###TODO Write a class that stores the camera etc
 ###TODO Rename file to avoid name collision with camera
 ###Check class methods work with threading
@@ -50,7 +51,9 @@ class PhotoResult():
         #print("Success")
         self.ok = True #success
         raw = np.frombuffer(self.buffer.get_data(),dtype=np.uint8).astype(float)
-        self.img = np.reshape(raw,[1544,2064])
+        self.img = {}
+        self.img['raw'] = np.reshape(raw,[1544,2064])
+        self.img['datetime'] = dt.now()
 
 class Camera_Control():
     def set_exposure(self,exposure):
@@ -142,7 +145,7 @@ class Camera_Control():
             streamsin, streamsout = stream.get_n_buffers()
             if pr[0].ok and pr[1].ok:
                 print("o  Both ok, saving (%d, %d)" % (streamsin, streamsout))
-                self.prs.put([pr[0].img,pr[1].img]) 
+                self.prs.put([pr[0].img,pr[1].img])
                 pr[0].returnbuffer()
                 pr[1].returnbuffer()                
             else:

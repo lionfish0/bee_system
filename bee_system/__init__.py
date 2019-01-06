@@ -1,4 +1,4 @@
-from flask import Flask, make_response
+from flask import Flask, make_response, jsonify
 from bee_system.blink_control import Blink_Control, configure_gpio
 from bee_system.camera_control import Camera_Control
 from bee_system.tracking_control import Tracking_Control
@@ -14,6 +14,7 @@ import base64
 import sys
 import os
 from mem_top import mem_top
+from datetime import datetime as dt
 
 app = Flask(__name__)
 CORS(app)
@@ -26,8 +27,14 @@ import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-@app.route('/startup/<int:exposure>/<int:gain>')
-def startup(exposure,gain):
+@app.route('/startup/<int:exposure>/<int:gain>/<string:timestring>')
+def startup(exposure,gain,timestring):
+    d = dt.strptime(timestring,"%Y-%m-%dT%H:%M:%S")
+    #NOTE: This requires:
+    #        sudo visudo
+    # then add:
+    #        pi ALL=(ALL) NOPASSWD: /bin/date
+    os.system('sudo /bin/date -s %s' % d.strftime("%Y-%m-%dT%H:%M:%S"))
     global startupdone
     if startupdone:
         return "Already Running"
@@ -64,8 +71,8 @@ def setinterval_int(interval):
     return setinterval(1.0*interval)
 
 
-@app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:stepsize>/<int:skipcalc>')
-def setcamera(exposure,gain,blocksize,offset,stepsize,skipcalc):
+@app.route('/setcamera/<int:exposure>/<int:gain>/<int:blocksize>/<int:offset>/<int:stepsize>/<int:skipcalc>/<int:searchcount>/<int:startx>/<int:starty>/<int:endx>/<int:endy>')
+def setcamera(exposure,gain,blocksize,offset,stepsize,skipcalc,searchcount,startx,starty,endx,endy):
 
     global startupdone
     if not startupdone:
@@ -79,10 +86,17 @@ def setcamera(exposure,gain,blocksize,offset,stepsize,skipcalc):
     for tracking_control in tracking_controls:
         tracking_control.blocksize.value = blocksize
         tracking_control.stepsize.value = stepsize
+        tracking_control.searchcount.value = searchcount
+        tracking_control.startx.value = startx
+        tracking_control.starty.value = starty
+        tracking_control.endx.value = endx
+        tracking_control.endy.value = endy                    
         tracking_control.offset.value = offset
         skipcalc = (skipcalc>0)
         tracking_control.skipcalc.value = skipcalc
-    
+        print("START and END: ")
+        print(tracking_control.startx.value,tracking_control.starty.value)
+        print(tracking_control.endx.value,tracking_control.endy.value)
     return "Setup complete"
 
 @app.route('/')
@@ -162,6 +176,50 @@ def getsystemstatus():
     else:
         return "0"
     
+@app.route('/getrawtrackingimage/<int:index>/<int:img>/<int:lowres>')
+def getrawtrackingimage(index,img,lowres):
+    if img<0 or img>1:
+        return "image must be 0 or 1"
+    if (index>=len(tracking_controls[0].tracking_results)) or (index<0):
+        return "out of range"
+    
+    if lowres:    
+        pair = tracking_controls[0].tracking_results[index]['lowresimages']
+    else:
+        pair = tracking_controls[0].tracking_results[index]['highresimages']
+    
+    return jsonify({'image':pair[img].astype(int).tolist()}) #TODO: add locations from below to JSON object
+    
+    #response = make_response(string_img)
+    #response.mimetype = 'text/plain'
+    #return response
+    
+    
+    """if lowres:    
+        for i,loc in enumerate(tracking_controls[0].tracking_results[index]['maxvals']):
+            axis.plot(loc['location'][1]/10,loc['location'][0]/10,marker,markersize=(10/(i+1)))
+            if i>3: marker = 'b+'
+            axis.plot(loc['location'][1]/10,loc['location'][0]/10,'xw',markersize=(loc['score']/5))            
+    else:
+        if img==0:
+            #shift = tracking_controls[0].tracking_results[index]['shift']
+            axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
+        if img==1:
+            axis.plot(pair[img].shape[0]/2,pair[img].shape[1]/2,'w+',markersize=20)
+            
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=1)
+    canvas = FigureCanvas(fig)
+    output = io.BytesIO()
+    fig.patch.set_alpha(0)
+    canvas.print_png(output)
+    response = make_response(output.getvalue())
+
+    response.mimetype = 'image/png'
+    return response"""
+    
+    
+    
+##########    
 @app.route('/gettrackingimage/<int:index>/<int:img>/<int:cmax>/<int:lowres>')
 def gettrackingimage(index,img,cmax,lowres):
     if cmax<1 or cmax>255:
@@ -203,7 +261,12 @@ def gettrackingimage(index,img,cmax,lowres):
     response = make_response(output.getvalue())
 
     response.mimetype = 'image/png'
-    return response
+    return response    
+    
+    
+    
+    
+##########
 
 import pickle
 @app.route('/getpickleddataset.p')

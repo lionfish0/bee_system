@@ -89,6 +89,8 @@ Interval <input id="interval" value=3 size=2/> seconds
 <button id="download" class="refreshimages">Download</button>
 <button id="imagedown" class="refreshimages">&lt;</button>
 <button id="imageup" class="refreshimages">&gt;</button>
+<button id="imagedownx10" class="refreshimages">&lt;&lt;</button>
+<button id="imageupx10" class="refreshimages">&gt;&gt;</button>
 <br />
 <input type="checkbox" id="latestimage">Update to latest image</input>
 <br />
@@ -101,6 +103,11 @@ Blocksize: <input id="blocksize" value="20" size="5" />pixels<br />
 Stepsize: <input id="stepsize" value="10" size="5" />pixels<br />
 Offset: <input id="offset" value="3" size="5" />pixels<br />
 SkipCalc: <input id="skipcalc" value="0" size="2" /><br />
+SearchCount: <input id="searchcount" value="1" size="2" />
+<br />
+Start: <input id="startx" value="100" size="4" /><input id="starty" value="100" size="4" />
+<br />
+End: <input id="endx" value="100" size="4" /><input id="endy" value="100" size="4" />
 <button id="set">Set</button>
 
 <br/>
@@ -123,11 +130,28 @@ Status: <span id="status">Offline</span>
 <span id="trackingresults">[no tracking results]</span>
 
 <script>
+function getdatestring() {
+    //https://stackoverflow.com/a/25835182
+    var d = new Date();
+
+    var curr_day = d.getDate();
+    var curr_month = d.getMonth();
+    var curr_year = d.getFullYear();
+
+    var curr_hour = d.getHours();
+    var curr_min = d.getMinutes();
+    var curr_sec = d.getSeconds();
+
+    curr_month++ ; // In js, first month is 0, not 1
+    st = curr_year + "-" + curr_month + "-" + curr_day + "T" + curr_hour + ":" + curr_min + ":" + curr_sec;
+    return st   
+}
+    
 image = 0
 trackingimagecount = 0
 $('button#startup').click(function(){
     $('span#status').text('Starting up...');
-    url = "http://"+$('input#url').val()+"/startup/"+$('input#exposure').val()+"/"+$('input#gain').val();
+    url = "http://"+$('input#url').val()+"/startup/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+getdatestring();
     $.ajax({
       url: url,
       success: function(data, status, jqXHR){
@@ -165,6 +189,8 @@ $('button#stop').click(function(){
 });
 $('button#imageup').click(function(){image=image+1;})
 $('button#imagedown').click(function(){image=image-1;})
+$('button#imageupx10').click(function(){image=image+10;})
+$('button#imagedownx10').click(function(){image=image-10;})
 
 setInterval(function(){ 
     url = "http://"+$('input#url').val()+"/gettrackingimagecount";
@@ -238,7 +264,7 @@ $('button#setinterval').click(function(){
 });
 $('button#set').click(function(){
     $('span#status').text('Setting...');
-    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+$('input#blocksize').val()+"/"+$('input#offset').val()+"/"+$('input#stepsize').val()+"/"+$('input#skipcalc').val();
+    url = "http://"+$('input#url').val()+"/setcamera/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+$('input#blocksize').val()+"/"+$('input#offset').val()+"/"+$('input#stepsize').val()+"/"+$('input#skipcalc').val()+"/"+$('input#searchcount').val()+"/"+$('input#startx').val()+"/"+$('input#starty').val()+"/"+$('input#endx').val()+"/"+$('input#endy').val();
     $.ajax({
       url: url,
       success: function(data, status, jqXHR){

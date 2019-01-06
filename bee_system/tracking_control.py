@@ -3,9 +3,10 @@ import retrodetect as rd
 import time
 from multiprocessing import Queue, Value
 import threading
+from datetime import datetime as dt
 
 def ascii_draw(mat):
-    symbols = np.array([s for s in ' .,:-=+*X#@'])[::-1]
+    symbols = np.array([s for s in ' .,:-=+*X#@@'])[::-1]
     msg = ""    
     mat = (11*mat/(np.max(mat)+1)).astype(int)
     mat[mat<0] = 0
@@ -29,9 +30,9 @@ def score_img(mat):
         m = max(m,mat[x,y])
     return np.max(mat) - m
         
-def erase_around(mat,x,y,extent=7):
+def erase_around(mat,x,y,extent=20):
     """
-    Erase [default 5] pixels around x,y in mat (set to zero).
+    Erase [default 20] pixels around x,y in mat (set to zero).
     Returns these pixels
     """
     #print("Erasing around %d,%d" % (x,y))
@@ -67,6 +68,12 @@ class Tracking_Control():
         self.offset = Value('i',2)
         self.stepsize = Value('i',10)
         self.skipcalc = Value('b',False)
+        self.searchcount = Value('i',1)
+        self.startx = Value('i',100)
+        self.starty = Value('i',100)
+        self.endx = Value('i',100)
+        self.endy = Value('i',100)        
+                
         t = threading.Thread(target=self.fill_tracking_results)
         t.start()
     def fill_tracking_results(self):
@@ -94,34 +101,47 @@ class Tracking_Control():
             #Awaiting image for processing [blocking]
             print("Waiting for image from camera control...(skipcalc=%d)" % self.skipcalc.value)
             pair = self.camera_queue.get()
-
-
             starttime = time.time()
             msg = ""
+
+            msg += "Saving data:\n"
+            msg += "time: %0.4f\n" % (time.time()-starttime)
+            print(pair[0]['raw'])
+            timestr = time.strftime("%Y%m%d_%H:%M:%S")
+            np.save(open('raw_%s_0.np' % timestr,'wb'),pair[0]['raw'].astype(np.byte))
+            msg += "time: %0.4f\n" % (time.time()-starttime)
+            np.save(open('raw_%s_1.np' % timestr,'wb'),pair[1]['raw'].astype(np.byte))
+            msg += "time: %0.4f\n" % (time.time()-starttime)
+            msg += "Done\n"
             msg += "Processing Images\n"
             msg += "time: %0.4f\n" % (time.time()-starttime)
             msg += "Computing Shift (stepsize=%d)\n" % self.stepsize.value
-            shift = rd.getshift(pair[0],pair[1],step=self.stepsize.value,searchbox=searchbox)
+            shift = rd.getshift(pair[0]['raw'],pair[1]['raw'],step=self.stepsize.value,searchbox=searchbox)
             msg += "    shift: %d %d\n" % (shift[0], shift[1])
             msg += "time: %0.4f\n" % (time.time()-starttime)
             msg += "Computing output non-flash blocked image\n"
             if not self.skipcalc.value:
-                out_img = rd.getblockmaxedimage(pair[1],self.blocksize.value,self.offset.value)
+                out_img = rd.getblockmaxedimage(pair[1]['raw'],self.blocksize.value,self.offset.value)
             else:
-                out_img = pair[1]
+                out_img = pair[1]['raw']
                 
             msg += "time: %0.4f\n" % (time.time()-starttime)
             
             if not self.skipcalc.value:
                 msg+="Aligning and subtracting\n"
-                done = rd.alignandsubtract(out_img,shift,pair[0])
+                start = np.array([self.startx.value,self.starty.value])
+                end = np.array(out_img.shape)-np.array([self.endx.value,self.endy.value])
+                
+                done = rd.alignandsubtract(out_img,shift,pair[0]['raw'])#,start=start,end=end)
                 msg += "time: %0.4f\n" % (time.time()-starttime)
                 
                 maxvals = []
-                for it in range(1):
+                for it in range(self.searchcount.value):
                     #print(".")
-                    argmax = done.argmax()
+                    argmax = done[start[0]-searchbox:end[0]-searchbox,start[1]-searchbox:end[1]-searchbox].argmax()
                     p = np.array(np.unravel_index(argmax, done.shape))
+                    p+=start-searchbox
+                    
                     maxval = done[p[0],p[1]]
                     peak_sample_img = erase_around(done,p[0],p[1])
                     score = score_img(peak_sample_img)
@@ -146,17 +166,19 @@ class Tracking_Control():
                     #print("Image %d" % img)
                     #lowresimages.append(pair[img][::10,::10].copy())
                     if img==0:
-                        lowresimages.append(pair[img][::10,::10].copy())
-                        #lowresimages.append(rd.getblockmaxedimage(pair[img],10,1)[::10,::10])
+                        im = pair[img]['raw'][::10,::10].copy()
+                        
+                        scalestart = (start/10).astype(int)
+                        scaleend = (end/10).astype(int)
+                        
+                        im[scalestart[0],scalestart[1]:scaleend[1]] = 255
+                        im[scaleend[0],scalestart[1]:scaleend[1]] = 255
+                        lowresimages.append(im)
                     else:
-                        #lowresimages.append(out_img[::10,::10].copy()) 
-                        #lowresimages.append(None)
-                        lowresimages.append(rd.shiftimg(out_img,shift,cval=255)[::10,::10].copy()) 
-                    #lowresimages.append(rd.getblockmaxedimage(pair[img])[::10,::10])
-                    msg += "time: %0.4f\n" % (time.time()-starttime)
-                    
+                        im = rd.shiftimg(out_img,shift,cval=255)[::10,::10].copy()
+                        lowresimages.append(im) 
+                    msg += "time: %0.4f\n" % (time.time()-starttime)   
             else:
-                #print("Skipping compute")
                 maxvals = []
                 lowresimages = []
                 shift = [np.nan,np.nan]
@@ -164,17 +186,19 @@ class Tracking_Control():
             
             msg += "Computation Complete, recording\n"
             msg += "time: %0.4f\n" % (time.time()-starttime)                    
-            #print("Computation Complete, saving")  
+
             highresimages = []
             for img in [0,1]:
-                im = pair[img]
+                im = pair[img]['raw']
                 if img == 1:
                     im = rd.shiftimg(im,shift,cval=255)
                 s = im.shape
                 highresimages.append(im[int(s[0]/2-100):int(s[0]/2+100),int(s[1]/2-100):int(s[1]/2+100)].copy())
             msg += "time: %0.4f\n" % (time.time()-starttime)
+            msg += "datetime0: %s\n" % pair[0]['datetime'].strftime("%Y-%m-%dT%H:%M:%S.%f")
+            msg += "datetime1: %s\n" % pair[1]['datetime'].strftime("%Y-%m-%dT%H:%M:%S.%f")
             #self.tracking_results.append({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift})
-            self.tracking_results_queue.put({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift,'msg':msg})
+            self.tracking_results_queue.put({'lowresimages':lowresimages,'highresimages':highresimages,'maxvals':maxvals,'shift':shift,'msg':msg,'dt0':pair[0]['datetime'].strftime("%Y-%m-%dT%H:%M:%S.%f"),'dt1':pair[1]['datetime'].strftime("%Y-%m-%dT%H:%M:%S.%f")})
              
             
             
