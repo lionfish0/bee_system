@@ -149,6 +149,7 @@ function getdatestring() {
     
 image = 0
 trackingimagecount = 0
+$("input#url").val(window.location.hostname+":5000")
 $('button#startup').click(function(){
     $('span#status').text('Starting up...');
     url = "http://"+$('input#url').val()+"/startup/"+$('input#exposure').val()+"/"+$('input#gain').val()+"/"+getdatestring();
